@@ -53,7 +53,7 @@ function createCard(card: Card, index: number): HTMLElement {
 
     // touch-none: lets a finger drag the card instead of scrolling the page
     el.classList.add(
-        'bg-white', 'cursor-grab', 'touch-none', 'hover:-translate-y-1', 'hover:shadow-xl',
+        'bg-white', 'border', 'border-black', 'cursor-grab', 'touch-none', 'hover:-translate-y-1', 'hover:shadow-xl',
         isRed(card) ? 'text-red-600' : 'text-slate-900',
     );
     el.innerHTML = `
@@ -134,23 +134,21 @@ export function render(selection: Selection | null, opts: RenderOptions = {}): v
         container.append(el);
     };
 
+    // Stacked piles show their top card plus the one beneath it, so the pile
+    // doesn't look empty while the top card is being dragged away
+    const placeTop = (el: HTMLElement, cards: Card[], type: PileType | 'stock', pile = 0) => {
+        el.replaceChildren();
+        const top = cards.slice(-2);
+        top.forEach((card, k) => place(el, card, type, pile, cards.length - top.length + k));
+    };
+
     const stock = slot('stock');
-    stock.replaceChildren();
-    const stockTop = state.stock.at(-1);
-    if (stockTop) place(stock, stockTop, 'stock', 0, state.stock.length - 1);
+    placeTop(stock, state.stock, 'stock');
     labelStock(stock);
 
-    const waste = slot('waste');
-    waste.replaceChildren();
-    const wasteTop = state.waste.at(-1);
-    if (wasteTop) place(waste, wasteTop, 'waste', 0, state.waste.length - 1);
+    placeTop(slot('waste'), state.waste, 'waste');
 
-    state.foundations.forEach((cards, i) => {
-        const el = slot('foundation', i);
-        el.replaceChildren();
-        const top = cards.at(-1);
-        if (top) place(el, top, 'foundation', i, cards.length - 1);
-    });
+    state.foundations.forEach((cards, i) => placeTop(slot('foundation', i), cards, 'foundation', i));
 
     state.tableau.forEach((cards, i) => {
         const el = slot('tableau', i);
