@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 @theme {
-  --color-mesa: oklch(0.45 0.12 155);
-  --color-mesa-oscura: oklch(0.32 0.09 155);
+  --color-felt: oklch(0.45 0.12 155);
+  --color-felt-dark: oklch(0.32 0.09 155);
 
-  --animate-repartir: repartir 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  --animate-voltear: voltear 0.35s ease-out;
-  --animate-sacudir: sacudir 0.35s ease-in-out;
-  --animate-aparecer: aparecer 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-deal: deal 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-flip: flip 0.35s ease-out;
+  --animate-shake: shake 0.35s ease-in-out;
+  --animate-pop-in: pop-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 
-  @keyframes repartir {
+  @keyframes deal {
     from {
       opacity: 0;
       transform: translateY(-3rem) scale(0.9);
@@ -19,7 +19,7 @@
       transform: none;
     }
   }
-  @keyframes voltear {
+  @keyframes flip {
     from {
       rotate: y 90deg;
     }
@@ -27,7 +27,7 @@
       rotate: y 0deg;
     }
   }
-  @keyframes sacudir {
+  @keyframes shake {
     0%,
     100% {
       translate: 0;
@@ -41,7 +41,7 @@
       translate: 6px 0;
     }
   }
-  @keyframes aparecer {
+  @keyframes pop-in {
     from {
       opacity: 0;
       transform: scale(0.85);
@@ -53,37 +53,52 @@
   }
 }
 
-/* Tamaño de carta responsive: 7 columnas que siempre caben en pantalla */
+/* Responsive card size: 7 columns that always fit on screen */
 :root {
-  --carta-w: min(calc((100vw - 3.5rem) / 7), 5.75rem);
-  --carta-h: calc(var(--carta-w) * 1.4);
-  --paso: calc(
-    var(--carta-h) * 0.22
-  ); /* cuánto asoma cada carta en una columna */
+  --card-w: min(calc((100vw - 3.5rem) / 7), 5.75rem);
+  --card-h: calc(var(--card-w) * 1.4);
+  --fan-step: calc(
+    var(--card-h) * 0.22
+  ); /* how much of each card peeks out in a column */
 }
 @media (width >= 40rem) {
   :root {
-    --carta-w: min(calc((100vw - 7.5rem) / 7), 5.75rem);
+    --card-w: min(calc((100vw - 7.5rem) / 7), 5.75rem);
   }
 }
 
-@utility dorso {
+@utility card-back {
   background: repeating-linear-gradient(
     45deg,
     var(--color-blue-700) 0 6px,
     var(--color-blue-600) 6px 12px
   );
 }
-@utility texto-esquina {
-  font-size: calc(var(--carta-w) * 0.22);
+@utility corner-text {
+  font-size: calc(var(--card-w) * 0.22);
 }
-@utility texto-centro {
-  font-size: calc(var(--carta-w) * 0.5);
+@utility center-text {
+  font-size: calc(var(--card-w) * 0.5);
 }
 
 @layer components {
-  .hueco {
-    @apply relative w-(--carta-w) h-(--carta-h) cursor-pointer rounded-lg
+  .slot {
+    @apply relative w-(--card-w) h-(--card-h) cursor-pointer rounded-lg
            outline-2 -outline-offset-2 outline-dashed outline-white/30;
   }
+}
+
+/* Drag and drop. Unlayered so it wins over the cards' shadow utilities */
+.card.dragging {
+  z-index: 60;
+  pointer-events: none;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.5);
+}
+.slot.drop-target {
+  outline: 3px solid var(--color-amber-300);
+  outline-offset: 3px;
+}
+body.is-dragging,
+body.is-dragging * {
+  cursor: grabbing;
 }
