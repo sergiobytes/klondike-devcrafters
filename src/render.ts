@@ -64,6 +64,27 @@ function createCard(card: Card, index: number): HTMLElement {
     return el;
 }
 
+// Cards left in the stock; once it's empty, a hint that clicking turns the waste over
+function labelStock(stock: HTMLElement): void {
+    const el = document.createElement('span');
+    const left = state.stock.length;
+    if (left) {
+        el.className =
+            'pointer-events-none absolute -bottom-2.5 left-1/2 z-10 min-w-6 -translate-x-1/2 ' +
+            'rounded-full bg-slate-900/85 px-1.5 py-0.5 text-center text-xs font-bold tabular-nums shadow';
+        el.textContent = String(left);
+        stock.title = `Quedan ${left} cartas en el mazo`;
+    } else if (state.waste.length) {
+        el.className =
+            'pointer-events-none absolute inset-0 grid place-items-center text-3xl text-white/50';
+        el.textContent = '↻';
+        stock.title = 'Volver a pasar el descarte al mazo';
+    } else {
+        stock.title = 'Mazo vacío';
+    }
+    stock.append(el);
+}
+
 function capturePositions(): Map<string, DOMRect> {
     const positions = new Map<string, DOMRect>();
     document.querySelectorAll<HTMLElement>('.card').forEach((el) => {
@@ -117,6 +138,7 @@ export function render(selection: Selection | null, opts: RenderOptions = {}): v
     stock.replaceChildren();
     const stockTop = state.stock.at(-1);
     if (stockTop) place(stock, stockTop, 'stock', 0, state.stock.length - 1);
+    labelStock(stock);
 
     const waste = slot('waste');
     waste.replaceChildren();
