@@ -101,7 +101,11 @@ export function enableDrag(table: HTMLElement, opts: DragOptions): void {
         if (!d.active) {
             if (Math.hypot(dx, dy) < THRESHOLD) return;
             d.active = true;
-            d.cards.forEach((el) => el.classList.add('dragging'));
+            d.cards.forEach((el) => {
+                // A card still dealing or flying to its place would ignore the inline transform
+                el.getAnimations().forEach((a) => a.cancel());
+                el.classList.add('dragging');
+            });
             document.body.classList.add('is-dragging');
         }
         d.cards.forEach((el) => (el.style.transform = `translate(${dx}px, ${dy}px)`));

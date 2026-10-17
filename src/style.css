@@ -4,7 +4,8 @@
   --color-felt: oklch(0.45 0.12 155);
   --color-felt-dark: oklch(0.32 0.09 155);
 
-  --animate-deal: deal 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  /* backwards, not both: holding the last frame would override the drag's inline transform */
+  --animate-deal: deal 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   --animate-flip: flip 0.35s ease-out;
   --animate-shake: shake 0.35s ease-in-out;
   --animate-pop-in: pop-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
