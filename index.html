@@ -2,10 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link
-      rel="icon"
-      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🃏</text></svg>"
-    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Solitario</title>
   </head>
@@ -14,20 +11,40 @@
   >
     <header class="mx-auto max-w-3xl px-3 py-3 sm:px-4 sm:py-4">
       <div class="flex items-center justify-between gap-2">
-        <h1 class="text-lg font-bold tracking-tight sm:text-2xl">🃏 Solitario</h1>
+        <h1
+          class="flex items-center gap-2 text-lg font-bold tracking-tight sm:text-2xl"
+        >
+          <i data-lucide="spade" class="size-5 fill-current sm:size-6"></i>
+          Solitario
+        </h1>
         <div class="flex items-center gap-2 text-sm sm:text-base">
           <button
             id="undo"
             title="Deshacer (Ctrl+Z)"
             aria-label="Deshacer"
-            class="rounded-lg bg-white/15 px-3 py-1.5 font-semibold ring-1 ring-white/30 transition hover:bg-white/25 active:scale-95 disabled:pointer-events-none disabled:opacity-40 sm:px-4 sm:py-2"
+            class="flex items-center gap-1.5 rounded-lg bg-white/15 px-3 py-1.5 font-semibold ring-1 ring-white/30 transition hover:bg-white/25 active:scale-95 disabled:pointer-events-none disabled:opacity-40 sm:px-4 sm:py-2"
           >
-            ↶<span class="hidden sm:inline"> Deshacer</span>
+            <i data-lucide="undo-2" class="size-4 sm:size-5"></i>
+            <span class="hidden sm:inline">Deshacer</span>
+          </button>
+          <button
+            id="hint"
+            aria-label="Pista"
+            class="flex items-center gap-1.5 rounded-lg bg-white/15 px-3 py-1.5 font-semibold ring-1 ring-white/30 transition hover:bg-white/25 active:scale-95 disabled:pointer-events-none disabled:opacity-40 sm:px-4 sm:py-2"
+          >
+            <i data-lucide="lightbulb" class="size-4 sm:size-5"></i>
+            <span class="hidden sm:inline">Pista</span>
+            <span
+              id="hints-left"
+              class="grid h-5 min-w-5 place-items-center rounded-full bg-amber-300 px-1 text-xs font-bold text-slate-900 tabular-nums"
+              >3</span
+            >
           </button>
           <button
             id="new-game"
-            class="rounded-lg bg-white px-3 py-1.5 font-semibold text-felt shadow transition hover:scale-105 active:scale-95 sm:px-4 sm:py-2"
+            class="flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 font-semibold text-felt shadow transition hover:scale-105 active:scale-95 sm:px-4 sm:py-2"
           >
+            <i data-lucide="shuffle" class="hidden size-5 sm:block"></i>
             Nuevo
           </button>
         </div>
@@ -54,8 +71,11 @@
           <dd id="score" class="font-bold tabular-nums sm:text-lg">0</dd>
         </div>
         <div id="best-box" class="rounded-lg bg-black/20 py-1.5">
-          <dt class="text-[0.65rem] tracking-wide text-amber-200/80 uppercase sm:text-xs">
-            🏆 Récord
+          <dt
+            class="flex items-center justify-center gap-1 text-[0.65rem] tracking-wide text-amber-200/80 uppercase sm:text-xs"
+          >
+            <i data-lucide="trophy" class="size-3 sm:size-3.5"></i>
+            Récord
           </dt>
           <dd id="best" class="font-bold text-amber-200 tabular-nums sm:text-lg">—</dd>
         </div>
@@ -87,9 +107,11 @@
 
     <button
       id="auto-complete"
-      class="fixed bottom-5 left-1/2 z-40 hidden -translate-x-1/2 rounded-full bg-amber-300 px-5 py-2.5 font-semibold text-slate-900 shadow-xl transition hover:scale-105 active:scale-95 motion-safe:animate-pop-in"
+      hidden
+      class="fixed bottom-5 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full bg-amber-300 px-5 py-2.5 font-semibold text-slate-900 shadow-xl transition hover:scale-105 active:scale-95 motion-safe:animate-pop-in"
     >
-      ⚡ Autocompletar
+      <i data-lucide="zap" class="size-4 fill-current"></i>
+      Autocompletar
     </button>
 
     <div
@@ -99,7 +121,10 @@
       <div
         class="rounded-2xl bg-white px-8 py-6 text-center text-slate-800 shadow-2xl motion-safe:animate-pop-in"
       >
-        <p class="text-5xl motion-safe:animate-bounce">🎉</p>
+        <i
+          data-lucide="party-popper"
+          class="mx-auto size-14 text-amber-500 motion-safe:animate-bounce"
+        ></i>
         <h2 class="mt-2 text-2xl font-bold">¡Ganaste!</h2>
         <p id="summary" class="mt-1 text-slate-500"></p>
         <p id="final-score" class="mt-3 text-3xl font-bold text-felt tabular-nums"></p>
@@ -110,6 +135,42 @@
           class="mt-4 rounded-lg bg-felt px-5 py-2 font-semibold text-white transition hover:scale-105 active:scale-95"
         >
           Jugar otra vez
+        </button>
+      </div>
+    </div>
+
+    <div
+      id="stuck"
+      class="fixed inset-0 z-100 hidden place-items-center bg-black/60 p-4 backdrop-blur-sm"
+    >
+      <div
+        class="max-w-sm rounded-2xl bg-white px-8 py-6 text-center text-slate-800 shadow-2xl motion-safe:animate-pop-in"
+      >
+        <i data-lucide="frown" class="mx-auto size-14 text-slate-400"></i>
+        <h2 class="mt-2 text-2xl font-bold">Sin movimientos</h2>
+        <p class="mt-1 text-slate-500">
+          Ya no quedan jugadas que te acerquen a ganar esta partida.
+        </p>
+        <div class="mt-4 flex justify-center gap-2">
+          <button
+            id="stuck-undo"
+            class="flex items-center gap-1.5 rounded-lg bg-slate-100 px-4 py-2 font-semibold text-slate-700 transition hover:bg-slate-200 active:scale-95"
+          >
+            <i data-lucide="undo-2" class="size-4"></i>
+            Deshacer
+          </button>
+          <button
+            id="stuck-new"
+            class="rounded-lg bg-felt px-5 py-2 font-semibold text-white transition hover:scale-105 active:scale-95"
+          >
+            Nueva partida
+          </button>
+        </div>
+        <button
+          id="stuck-close"
+          class="mt-3 text-sm text-slate-500 underline-offset-2 hover:underline"
+        >
+          Ver la mesa
         </button>
       </div>
     </div>

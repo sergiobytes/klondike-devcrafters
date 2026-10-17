@@ -1,5 +1,7 @@
 import { isRed, rankName } from './deck';
 import { state } from './game';
+import type { Hint } from './game';
+import { icon, RotateCcw, Trophy } from './icons';
 import type { BestScore } from './scoring';
 import { formatTime } from './timer';
 import type { Card, PileType, Selection } from './types';
@@ -8,6 +10,7 @@ export interface RenderOptions {
     deal?: boolean;
     flipped?: string | null;
     invalid?: string | null;
+    recycled?: boolean;
 }
 
 export interface Hud {
@@ -17,6 +20,8 @@ export interface Hud {
     best: BestScore | null;
     canUndo: boolean;
     canAutoComplete: boolean;
+    hintsLeft: number;
+    canHint: boolean;
 }
 
 export interface WinSummary {
@@ -27,6 +32,11 @@ export interface WinSummary {
     isNewBest: boolean;
     best: BestScore;
 }
+
+const RECYCLE_GHOSTS = 6; // cards shown flying back when the waste is turned over
+const HINT_DURATION = 4000; // ms the hinted cards keep pulsing
+
+let hintTimeout: ReturnType<typeof setTimeout> | undefined;
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
@@ -75,9 +85,8 @@ function labelStock(stock: HTMLElement): void {
         el.textContent = String(left);
         stock.title = `Quedan ${left} cartas en el mazo`;
     } else if (state.waste.length) {
-        el.className =
-            'pointer-events-none absolute inset-0 grid place-items-center text-3xl text-white/50';
-        el.textContent = '↻';
+        el.className = 'pointer-events-none absolute inset-0 grid place-items-center text-white/50';
+        el.append(icon(RotateCcw, 'size-1/2'));
         stock.title = 'Volver a pasar el descarte al mazo';
     } else {
         stock.title = 'Mazo vacío';
@@ -112,7 +121,67 @@ function animateFrom(before: Map<string, DOMRect>): void {
     });
 }
 
+// A loose two-sided copy of a card, outside the table, that only lives while it animates
+function createGhost(card: Card, at: DOMRect): HTMLElement {
+    const ghost = document.createElement('div');
+    ghost.className = 'ghost pointer-events-none fixed';
+    Object.assign(ghost.style, {
+        left: `${at.left}px`, top: `${at.top}px`,
+        width: `${at.width}px`, height: `${at.height}px`,
+        transformStyle: 'preserve-3d',
+    });
+
+    const front = createCard({ ...card, faceUp: true }, 0);
+    const back = createCard({ ...card, faceUp: false }, 0);
+    back.style.transform = 'rotateY(180deg)';
+    for (const face of [front, back]) {
+        face.classList.remove('card'); // keep it out of the FLIP bookkeeping and dragging
+        face.style.backfaceVisibility = 'hidden';
+    }
+    ghost.append(front, back);
+    return ghost;
+}
+
+// Turning the waste over: its top cards fly back one after another, flipping face down
+function animateRecycle(stock: HTMLElement): void {
+    if (reducedMotion.matches) return;
+    const from = slot('waste').getBoundingClientRect();
+    const to = stock.getBoundingClientRect();
+    const dx = to.left - from.left;
+    const dy = to.top - from.top;
+    const arc = Math.min(28, Math.hypot(dx, dy) * 0.25); // lift the cards a bit mid-flight
+
+    // The stock fills up when the first card lands
+    const landed = Array.from(stock.children) as HTMLElement[];
+    landed.forEach((el) => (el.style.visibility = 'hidden'));
+
+    // The stock is the old waste upside down, so the old top cards are now at its start
+    state.stock.slice(0, RECYCLE_GHOSTS).forEach((card, i) => {
+        const ghost = createGhost(card, from);
+        ghost.style.zIndex = String(60 - i); // the old top card starts above the rest
+        document.body.append(ghost);
+
+        const animation = ghost.animate(
+            [
+                { transform: 'perspective(800px) translate(0, 0) rotateY(0deg) scale(1)' },
+                {
+                    transform: `perspective(800px) translate(${dx / 2}px, ${dy / 2 - arc}px) rotateY(-90deg) scale(1.08)`,
+                    offset: 0.5,
+                },
+                { transform: `perspective(800px) translate(${dx}px, ${dy}px) rotateY(-180deg) scale(1)` },
+            ],
+            { duration: 380, delay: i * 45, easing: 'cubic-bezier(0.4, 0, 0.2, 1)' },
+        );
+        animation.onfinish = () => {
+            if (i === 0) landed.forEach((el) => (el.style.visibility = ''));
+            ghost.remove();
+        };
+    });
+}
+
 export function render(selection: Selection | null, opts: RenderOptions = {}): void {
+    if (opts.deal) document.querySelectorAll('.ghost').forEach((el) => el.remove());
+    clearHint();
     const before = capturePositions();
     let order = 0;
 
@@ -160,7 +229,9 @@ export function render(selection: Selection | null, opts: RenderOptions = {}): v
             cards.length > 1 ? `calc(var(--card-h) + var(--fan-step) * ${cards.length - 1})` : '';
     });
 
-    if (!opts.deal) animateFrom(before);
+    // Nothing else moves when the waste is turned over, so skip the regular FLIP
+    if (opts.recycled) animateRecycle(stock);
+    else if (!opts.deal) animateFrom(before);
 }
 
 export function updateHud(hud: Hud): void {
@@ -172,13 +243,40 @@ export function updateHud(hud: Hud): void {
         ? `${formatTime(hud.best.seconds)} · ${hud.best.moves} movimientos`
         : 'Aún no hay récord';
     $<HTMLButtonElement>('#undo').disabled = !hud.canUndo;
-    $('#auto-complete').classList.toggle('hidden', !hud.canAutoComplete);
+    $('#auto-complete').hidden = !hud.canAutoComplete;
+
+    const hint = $<HTMLButtonElement>('#hint');
+    hint.disabled = !hud.canHint;
+    if (!hud.hintsLeft) hint.title = 'Ya no te quedan pistas en esta partida';
+    else hint.title = hud.hintsLeft === 1 ? 'Pista (H) · te queda 1' : `Pista (H) · te quedan ${hud.hintsLeft}`;
+    $('#hints-left').textContent = String(hud.hintsLeft);
 }
 
-function toggleWin(show: boolean): void {
-    const win = $('#win');
-    win.classList.toggle('hidden', !show);
-    win.classList.toggle('grid', show);
+export function clearHint(): void {
+    clearTimeout(hintTimeout);
+    document.querySelectorAll('.hint').forEach((el) => el.classList.remove('hint'));
+}
+
+// Makes the suggested cards and the spot where they go pulse for a few seconds
+export function showHint(hint: Hint): void {
+    clearHint();
+    if (hint.kind === 'draw') {
+        slot('stock').classList.add('hint');
+    } else {
+        const cards = (el: HTMLElement) => Array.from(el.querySelectorAll<HTMLElement>('.card'));
+        cards(slot(hint.from.type, hint.from.pile))
+            .filter((el) => Number(el.dataset.cardIndex) >= hint.from.index)
+            .forEach((el) => el.classList.add('hint'));
+        const target = slot(hint.to, hint.pile);
+        (cards(target).at(-1) ?? target).classList.add('hint');
+    }
+    hintTimeout = setTimeout(clearHint, HINT_DURATION);
+}
+
+function toggleDialog(id: string, show: boolean): void {
+    const dialog = $(id);
+    dialog.classList.toggle('hidden', !show);
+    dialog.classList.toggle('grid', show);
 }
 
 export function showWin(s: WinSummary): void {
@@ -187,14 +285,22 @@ export function showWin(s: WinSummary): void {
     $('#bonus').textContent = s.bonus ? `incluye +${formatNumber(s.bonus)} de bono por tiempo` : '';
 
     const record = $('#record-message');
-    record.textContent = s.isNewBest
-        ? '🏆 ¡Nuevo récord!'
-        : `Récord: ${formatNumber(s.best.score)} puntos`;
+    record.replaceChildren(
+        icon(Trophy, 'size-4'),
+        s.isNewBest ? '¡Nuevo récord!' : `Récord: ${formatNumber(s.best.score)} puntos`,
+    );
     record.className =
-        'mt-3 rounded-lg px-3 py-1.5 text-sm font-semibold ' +
+        'mt-3 flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold ' +
         (s.isNewBest ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-600');
 
-    toggleWin(true);
+    toggleDialog('#win', true);
 }
 
-export const hideWin = (): void => toggleWin(false);
+export const hideWin = (): void => toggleDialog('#win', false);
+
+export function showStuck(canUndo: boolean): void {
+    $('#stuck-undo').hidden = !canUndo;
+    toggleDialog('#stuck', true);
+}
+
+export const hideStuck = (): void => toggleDialog('#stuck', false);

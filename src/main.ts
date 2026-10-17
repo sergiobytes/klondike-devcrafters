@@ -1,20 +1,23 @@
 import './style.css';
 import { enableDrag } from './drag';
 import {
-  autoCompleteStep, canAutoComplete, canPick, canUndo, draw, getPile, hasWon,
-  isValidMove, move, newGame, sendToFoundation, state, undo,
+  autoCompleteStep, canAutoComplete, canPick, canUndo, draw, findHint, getPile, hasWon,
+  isStuck, isValidMove, move, newGame, sendToFoundation, state, undo,
 } from './game';
-import { hideWin, render, showWin, updateHud } from './render';
+import { mountIcons } from './icons';
+import { hideStuck, hideWin, render, showHint, showStuck, showWin, updateHud } from './render';
 import type { RenderOptions } from './render';
 import { currentScore, loadBest, saveBest, winBonus } from './scoring';
 import * as timer from './timer';
 import type { PileType, Selection } from './types';
 
 const AUTO_COMPLETE_DELAY = 110; // ms between cards while auto-completing
-const WIN_DELAY = 400;           // let the last card land before showing the win dialog
+const DIALOG_DELAY = 400;        // let the last card land before showing a dialog
+const HINTS_PER_GAME = 3;
 
 let selection: Selection | null = null;
 let best = loadBest();
+let hintsLeft = HINTS_PER_GAME;
 let autoCompleting = false;
 let pendingTimeout: ReturnType<typeof setTimeout> | undefined;
 let pausedWhileHidden = false;
@@ -31,6 +34,8 @@ function refreshHud(): void {
     best,
     canUndo: canUndo() && !isLocked(),
     canAutoComplete: canAutoComplete() && !isLocked(),
+    hintsLeft,
+    canHint: hintsLeft > 0 && !isLocked(),
   });
 }
 
@@ -39,20 +44,31 @@ function startGame(): void {
   autoCompleting = false;
   pausedWhileHidden = false;
   selection = null;
+  hintsLeft = HINTS_PER_GAME;
   newGame();
   timer.reset();
   hideWin();
+  hideStuck();
   render(null, { deal: true });
   refreshHud();
 }
 
-// After every valid move: start the clock on the first one, redraw and check for a win
+// After every valid move: start the clock on the first one, redraw and check how the game stands
 function afterMove(opts: RenderOptions = {}): void {
   selection = null;
   if (!timer.isRunning()) timer.start(refreshHud);
   render(null, opts);
   if (hasWon()) finishGame();
+  else checkStuck();
   refreshHud();
+}
+
+// No useful move left: the game is over (the dialog still offers undo)
+function checkStuck(): void {
+  if (!isStuck()) return;
+  timer.stop();
+  const undoable = canUndo();
+  pendingTimeout = setTimeout(() => showStuck(undoable), DIALOG_DELAY);
 }
 
 function finishGame(): void {
@@ -70,7 +86,7 @@ function finishGame(): void {
   best = record;
 
   const summary = { score, bonus, seconds, moves: state.moves, isNewBest, best: record };
-  pendingTimeout = setTimeout(() => showWin(summary), WIN_DELAY);
+  pendingTimeout = setTimeout(() => showWin(summary), DIALOG_DELAY);
 }
 
 function tryMove(from: Selection, type: PileType, pile: number): void {
@@ -111,8 +127,22 @@ function clickPile(type: PileType, pile: number, index: number): void {
 
 function undoMove(): void {
   if (isLocked() || !undo()) return;
+  clearTimeout(pendingTimeout);
+  hideStuck();
   selection = null;
   render(null);
+  checkStuck();
+  refreshHud();
+}
+
+function useHint(): void {
+  if (isLocked() || hintsLeft === 0) return;
+  const hint = findHint();
+  if (!hint) return;
+  hintsLeft--;
+  selection = null;
+  render(null);
+  showHint(hint);
   refreshHud();
 }
 
@@ -139,9 +169,10 @@ table.addEventListener('click', (e) => {
   if (!slotEl) return;
 
   if (slotEl.dataset.pile === 'stock') {
+    const recycled = state.stock.length === 0; // drawing from an empty stock turns the waste over
     const r = draw();
     if (r.valid) {
-      afterMove({ flipped: r.flipped });
+      afterMove({ flipped: r.flipped, recycled });
     } else {
       selection = null;
       render(null);
@@ -165,17 +196,27 @@ enableDrag(table, {
 });
 
 document.querySelector('#undo')!.addEventListener('click', undoMove);
+document.querySelector('#hint')!.addEventListener('click', useHint);
 document.querySelector('#auto-complete')!.addEventListener('click', autoComplete);
 document.querySelector('#new-game')!.addEventListener('click', startGame);
 document.querySelector('#play-again')!.addEventListener('click', startGame);
+document.querySelector('#stuck-undo')!.addEventListener('click', undoMove);
+document.querySelector('#stuck-new')!.addEventListener('click', startGame);
+document.querySelector('#stuck-close')!.addEventListener('click', hideStuck);
 
 document.addEventListener('keydown', (e) => {
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+  const key = e.key.toLowerCase();
+  if ((e.ctrlKey || e.metaKey) && key === 'z') {
     e.preventDefault();
     undoMove();
-  } else if (e.key === 'Escape' && selection) {
-    selection = null;
-    render(null);
+  } else if (key === 'h' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    useHint();
+  } else if (e.key === 'Escape') {
+    hideStuck();
+    if (selection) {
+      selection = null;
+      render(null);
+    }
   }
 });
 
@@ -190,4 +231,5 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
+mountIcons();
 startGame();
