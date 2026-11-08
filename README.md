@@ -1,5 +1,9 @@
 # Solitario Klondike
 
+**Español** · [English](README.en.md)
+
+[![Una partida a medias: escaleras en el tablero, cartas en las fundaciones y el marcador de tiempo, movimientos y puntos](docs/screenshot.png)](https://sergiobytes.github.io/klondike-devcrafters/)
+
 El solitario clásico de toda la vida, hecho para el navegador con TypeScript, Vite y Tailwind CSS. Se juega con ratón, teclado o pantalla táctil.
 
 **[Jugar ahora →](https://sergiobytes.github.io/klondike-devcrafters/)**
@@ -52,7 +56,7 @@ La puntuación nunca baja de 0. Deshacer devuelve los puntos de la jugada, pero 
 
 ## Desarrollo
 
-Requisitos: **Node.js 20.19+ o 22.12+** (lo que pide Vite 8).
+Requisitos: **Node.js 22.12+ o 24+**, en versión LTS (lo que piden Vite 8 y Vitest 5).
 
 ```bash
 npm install      # instala las dependencias
@@ -67,6 +71,7 @@ npm run preview  # sirve dist/ en local para probar el build
 - [Vite](https://vite.dev/) para el servidor de desarrollo y el build.
 - [Tailwind CSS v4](https://tailwindcss.com/) para los estilos.
 - [Lucide](https://lucide.dev/) para los iconos. Solo se incluyen en el bundle los que se usan.
+- [Vitest](https://vitest.dev/) para las pruebas unitarias.
 
 ### Estructura
 
@@ -82,13 +87,26 @@ src/
 ├── drag.ts      # Arrastrar y soltar con Pointer Events (ratón, táctil y lápiz)
 ├── icons.ts     # Iconos de Lucide
 ├── types.ts     # Tipos compartidos
-└── style.css    # Tema de Tailwind, tamaño de las cartas y animaciones
+├── style.css    # Tema de Tailwind, tamaño de las cartas y animaciones
+└── *.test.ts    # Pruebas unitarias, con utilidades comunes en test-helpers.ts
 ```
 
 La lógica del juego (`game.ts`, `rules.ts`, `deck.ts`, `scoring.ts`) no depende del DOM; todo lo visual vive en `render.ts` y `drag.ts`.
 
+## Tests
+
+La lógica del juego tiene pruebas unitarias con Vitest: reglas, baraja, reparto, deshacer, autocompletar, pistas, fin de partida y puntuación.
+
+```bash
+npm test               # corre las pruebas una vez
+npm run test:coverage  # y además genera el informe de cobertura (en consola y en coverage/)
+npx vitest             # modo watch: las vuelve a correr al guardar
+```
+
+La cobertura se mide sobre los módulos de lógica (`game.ts`, `rules.ts`, `deck.ts`, `scoring.ts`); la parte visual (`render.ts`, `drag.ts`, `main.ts`) se prueba jugando.
+
 ## Despliegue
 
-Cada push a `main` publica el juego en GitHub Pages mediante el workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): instala las dependencias, genera el build y sube `dist/` a Pages. También se puede lanzar a mano desde la pestaña **Actions**.
+Cada push a `main` publica el juego en GitHub Pages mediante el workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml): instala las dependencias, corre los tests, genera el build y sube `dist/` a Pages. Si falla algún test, no se despliega. También se puede lanzar a mano desde la pestaña **Actions**.
 
 La opción `base` de [`vite.config.ts`](vite.config.ts) (`/klondike-devcrafters/`) tiene que coincidir con el nombre del repositorio. Si haces un fork con otro nombre, cámbiala o los recursos darán 404.
